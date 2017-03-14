@@ -14,11 +14,9 @@ FusionEKF::FusionEKF() {
 
   previous_timestamp_ = 0;
 
-  // ekf_ is already created. need first measurement to have everything else to call ekf.Init
-
   // initializing matrices
 
-  // laser measurement function
+  // laser measurement matrix
   H_laser_ = MatrixXd(2, 4);
   H_laser_ << 1., 0., 0., 0.,
               0., 1., 0., 0.;
@@ -26,19 +24,13 @@ FusionEKF::FusionEKF() {
   R_laser_ = MatrixXd(2, 2);
   R_laser_ << 0.0225, 0, // from lectures
               0,      0.0225;
-//  R_laser_ << 0.15, 0., // this is from matlab generating code
-//              0.,   0.15;
 
-  // radar measurement function
-  //Hj_ = MatrixXd(3, 4); // Jacobian, depends on the state, calculated later
+  // radar measurement function has to use Jacobian, depends on the state, calculated later
   // radar measurement covariance
   R_radar_ = MatrixXd(3, 3);
   R_radar_ << 0.0225,  0.,     0., //from lectures
               0.,      0.0225, 0.,
               0.,      0.,     0.0225;
-//  R_radar_ << 0.3,  0.,     0., // from matlab generating code
-//          0.,      0.03, 0.,
-//          0.,      0.,     0.3;
 
 }
 
@@ -55,20 +47,16 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
     /**
       * Initialize the state ekf_.x_ with the first measurement.
+      * Assume zero velocity to start with. Take first measurement x,y as position at the start.
     */
     ekf_.x_ = VectorXd(4);
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-      /**
-      Convert radar from polar to cartesian coordinates and initialize state.
-      */
+      // Convert radar from polar to cartesian coordinates
       float ro = measurement_pack.raw_measurements_(0);
       float phi = measurement_pack.raw_measurements_(1);
       ekf_.x_ << ro * cos(phi), ro * sin(phi), 0.0, 0.0;
     }
     else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
-      /**
-      Initialize state.
-      */
       ekf_.x_ << measurement_pack.raw_measurements_(0), measurement_pack.raw_measurements_(1), 0.0, 0.0;
     }
 
@@ -76,23 +64,23 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       * Create the covariance matrix.
     */
     ekf_.P_ = MatrixXd(4, 4);
-    ekf_.P_ << 1000., 0.,    0.,    0., // we do not know what pedestrian is
+    ekf_.P_ << 1000., 0.,    0.,    0., // we do not know where pedestrian is
                0.,    1000., 0.,    0.,
-               0.,    0.,    0.001,    0., // but we assume it does not move. for now
+               0.,    0.,    0.001,    0., // but we assume pedestrian does not move. for now
                0.,    0.,    0.,    0.001;
 
     previous_timestamp_ = measurement_pack.timestamp_;
 
-    ekf_.F_ = MatrixXd(4, 4);
+    ekf_.F_ = MatrixXd(4, 4); // to be initialized at each update
     ekf_.Q_ = MatrixXd(4, 4);
 
-    // done initializing, no need to predict or update
     is_initialized_ = true;
 
     // print the output
     cout << "x_ = " << ekf_.x_ << endl;
     cout << "P_ = " << ekf_.P_ << endl;
 
+    // done initializing, no need to predict or update
     return;
   }
 
@@ -106,7 +94,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   cout << "dt = " << dt << endl;
 
   if (dt > 0.00001) {
-    // only predict if non-simultaneous measurements
+    // only predict if processing non-simultaneous measurements
     /**
        * Update the state transition matrix F according to the new elapsed time.
      */
@@ -124,7 +112,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
             0., (dt / 2.) * noise_ay_, 0., noise_ay_;
     ekf_.Q_ *= dtsq;
 
-    ekf_.Predict();
+    ekf_.Predict(); // Kalman Filter prediction step
 
     cout << "predict done" << endl;
     cout << "x_ = " << ekf_.x_ << endl;
@@ -140,28 +128,29 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    */
 
   if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-    // Radar updates
+    // Radar update
 
-    //measurement covariance
+    //set measurement covariance
     ekf_.R_ = R_radar_;
-    //measurement matrix
+    //set measurement matrix to be Jacobian of non-linear h(x)
     ekf_.H_ = tools.CalculateJacobian(ekf_.x_);
 
+    // Extended Kalman Filter measurement update
     ekf_.UpdateEKF(measurement_pack.raw_measurements_);
     cout << "radar update done" << endl;
 
   } else {
-    // Laser updates
+    // Laser update
 
-    //measurement covariance
+    //set measurement covariance
     ekf_.R_ = R_laser_;
-    //measurement matrix
+    //set measurement matrix
     ekf_.H_ = H_laser_;
 
+    // Kalman Filter measurement update
     ekf_.Update(measurement_pack.raw_measurements_);
     cout << "laser update done" << endl;
   }
-
 
   // print the output
   cout << "x_ = " << ekf_.x_ << endl;

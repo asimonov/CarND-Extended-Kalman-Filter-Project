@@ -16,8 +16,7 @@ void KalmanFilter::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
 
 void KalmanFilter::Predict() {
   /**
-  TODO:
-    * predict the state
+    * predict the state. standard KF equations. assume U==0
   */
   // KF Prediction step
   x_ = F_*x_;
@@ -26,7 +25,6 @@ void KalmanFilter::Predict() {
 
 void KalmanFilter::Update(const VectorXd &z) {
   /**
-  TODO:
     * update the state by using Kalman Filter equations
   */
   // KF Measurement update step
@@ -42,7 +40,6 @@ void KalmanFilter::Update(const VectorXd &z) {
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   /**
-  TODO:
     * update the state by using Extended Kalman Filter equations, but non-linear radar measurement h(x)
   */
   float rho = sqrt(x_(0)*x_(0) + x_(1)*x_(1));

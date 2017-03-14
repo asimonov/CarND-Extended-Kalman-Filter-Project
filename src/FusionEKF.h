@@ -31,7 +31,7 @@ public:
   KalmanFilter ekf_;
 
 private:
-  // check whether the tracking toolbox was initiallized or not (first measurement)
+  // check whether the tracking toolbox was initialized or not (first measurement)
   bool is_initialized_;
 
   // previous timestamp
@@ -44,7 +44,7 @@ private:
   MatrixXd H_laser_;
   MatrixXd Hj_;
 
-  // acceleration noise
+  // acceleration noise. found empirically to produce best RMSE for the given data
   float noise_ax_ = 10.0;
   float noise_ay_ = 9.0;
 };
