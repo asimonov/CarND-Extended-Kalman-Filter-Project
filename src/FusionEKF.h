@@ -45,8 +45,8 @@ private:
   MatrixXd Hj_;
 
   // acceleration noise
-  float noise_ax_ = 5.;
-  float noise_ay_ = 5.;
+  float noise_ax_ = 10.0;
+  float noise_ay_ = 9.0;
 };
 
 #endif /* FusionEKF_H_ */

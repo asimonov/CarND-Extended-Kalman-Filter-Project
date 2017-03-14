@@ -20,20 +20,25 @@ FusionEKF::FusionEKF() {
 
   // laser measurement function
   H_laser_ = MatrixXd(2, 4);
-  H_laser_ << 1, 0, 0, 0,
-              0, 1, 0, 0;
+  H_laser_ << 1., 0., 0., 0.,
+              0., 1., 0., 0.;
   // laser measurement covariance
   R_laser_ = MatrixXd(2, 2);
-  R_laser_ << 0.0225, 0,
+  R_laser_ << 0.0225, 0, // from lectures
               0,      0.0225;
+//  R_laser_ << 0.15, 0., // this is from matlab generating code
+//              0.,   0.15;
 
   // radar measurement function
   //Hj_ = MatrixXd(3, 4); // Jacobian, depends on the state, calculated later
   // radar measurement covariance
   R_radar_ = MatrixXd(3, 3);
-  R_radar_ << 0.0225,  0.,     0.,
+  R_radar_ << 0.0225,  0.,     0., //from lectures
               0.,      0.0225, 0.,
               0.,      0.,     0.0225;
+//  R_radar_ << 0.3,  0.,     0., // from matlab generating code
+//          0.,      0.03, 0.,
+//          0.,      0.,     0.3;
 
 }
 
@@ -64,22 +69,30 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
       /**
       Initialize state.
       */
-      ekf_.x_ << measurement_pack.raw_measurements_[0], measurement_pack.raw_measurements_[1], 0.0, 0.0;
+      ekf_.x_ << measurement_pack.raw_measurements_(0), measurement_pack.raw_measurements_(1), 0.0, 0.0;
     }
 
     /**
       * Create the covariance matrix.
     */
     ekf_.P_ = MatrixXd(4, 4);
-    ekf_.P_ << 1000., 0.,    0.,    0.,
+    ekf_.P_ << 1000., 0.,    0.,    0., // we do not know what pedestrian is
                0.,    1000., 0.,    0.,
-               0.,    0.,    1000., 0.,
-               0.,    0.,    0.,    1000.;
+               0.,    0.,    0.001,    0., // but we assume it does not move. for now
+               0.,    0.,    0.,    0.001;
 
     previous_timestamp_ = measurement_pack.timestamp_;
 
+    ekf_.F_ = MatrixXd(4, 4);
+    ekf_.Q_ = MatrixXd(4, 4);
+
     // done initializing, no need to predict or update
     is_initialized_ = true;
+
+    // print the output
+    cout << "x_ = " << ekf_.x_ << endl;
+    cout << "P_ = " << ekf_.P_ << endl;
+
     return;
   }
 
@@ -92,26 +105,31 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   previous_timestamp_ = measurement_pack.timestamp_;
   cout << "dt = " << dt << endl;
 
-  /**
-     * Update the state transition matrix F according to the new elapsed time.
-   */
-  ekf_.F_ = MatrixXd(4, 4);
-  ekf_.F_ << 1., 0., dt, 0.,
-             0., 1., 0., dt,
-             0., 0., 1., 0.,
-             0., 0., 0., 1.;
-  /**
-     * Update the process noise covariance matrix.
-   */
-  float dtsq = dt*dt;
-  ekf_.Q_ = MatrixXd(4, 4);
-  ekf_.Q_ << (dtsq/4.)*noise_ax_, 0,                   (dt/2.)*noise_ax_, 0,
-          0,                   (dtsq/4.)*noise_ay_, 0,                 (dt/2.)*noise_ay_,
-          (dt/2.)*noise_ax_,   0,                   noise_ax_,         0,
-          0,                   (dt/2.)*noise_ay_,   0,                 noise_ay_;
-  ekf_.Q_ *= dtsq;
+  if (dt > 0.00001) {
+    // only predict if non-simultaneous measurements
+    /**
+       * Update the state transition matrix F according to the new elapsed time.
+     */
+    ekf_.F_ << 1., 0., dt, 0.,
+            0., 1., 0., dt,
+            0., 0., 1., 0.,
+            0., 0., 0., 1.;
+    /**
+       * Update the process noise covariance matrix.
+     */
+    float dtsq = dt * dt;
+    ekf_.Q_ << (dtsq / 4.) * noise_ax_, 0., (dt / 2.) * noise_ax_, 0.,
+            0., (dtsq / 4.) * noise_ay_, 0., (dt / 2.) * noise_ay_,
+            (dt / 2.) * noise_ax_, 0., noise_ax_, 0.,
+            0., (dt / 2.) * noise_ay_, 0., noise_ay_;
+    ekf_.Q_ *= dtsq;
 
-  ekf_.Predict();
+    ekf_.Predict();
+
+    cout << "predict done" << endl;
+    cout << "x_ = " << ekf_.x_ << endl;
+    cout << "P_ = " << ekf_.P_ << endl;
+  }
 
   /*****************************************************************************
    *  Update
@@ -129,6 +147,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     //measurement matrix
     ekf_.H_ = tools.CalculateJacobian(ekf_.x_);
 
+    ekf_.UpdateEKF(measurement_pack.raw_measurements_);
+    cout << "radar update done" << endl;
+
   } else {
     // Laser updates
 
@@ -137,9 +158,10 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     //measurement matrix
     ekf_.H_ = H_laser_;
 
+    ekf_.Update(measurement_pack.raw_measurements_);
+    cout << "laser update done" << endl;
   }
 
-  ekf_.Update(measurement_pack.raw_measurements_);
 
   // print the output
   cout << "x_ = " << ekf_.x_ << endl;

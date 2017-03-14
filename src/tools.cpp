@@ -6,11 +6,7 @@ Tools::Tools() {}
 Tools::~Tools() {}
 
 VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
-                              const vector<VectorXd> &ground_truth) {
-  /**
-  TODO:
-    * Calculate the RMSE here.
-  */
+                       const vector<VectorXd> &ground_truth){
 
     VectorXd rmse(4);
     rmse << 0,0,0,0;
@@ -18,29 +14,32 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
     // check the validity of the following inputs:
     //  * the estimation vector size should not be zero
     //  * the estimation vector size should equal ground truth vector size
-    if (estimations.size() == 0 || ground_truth.size() == 0 || estimations.size() != ground_truth.size())
-    {
-        cout << "CalculateRMSE() - wrong size of input vectors" << endl;
+    if(estimations.size() != ground_truth.size()
+       || estimations.size() == 0){
+        cout << "Invalid estimation or ground_truth data" << endl;
+        return rmse;
     }
 
     //accumulate squared residuals
-    VectorXd s(4);
-    for(int i=0; i < estimations.size(); ++i){
-        VectorXd a = estimations[i]-ground_truth[i];
-        VectorXd b = a.array()*a.array();
-        s += b;
+    for(unsigned int i=0; i < estimations.size(); ++i){
+
+        VectorXd residual = estimations[i] - ground_truth[i];
+
+        //coefficient-wise multiplication
+        residual = residual.array()*residual.array();
+        rmse += residual;
     }
 
     //calculate the mean
-    s /= float(estimations.size());
+    rmse = rmse/estimations.size();
 
     //calculate the squared root
-    rmse = s.array().sqrt();
+    rmse = rmse.array().sqrt();
 
     //return the result
     return rmse;
-
 }
+
 
 MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) {
   /**
@@ -58,6 +57,11 @@ MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) {
     if (sumsq <= 1e-6)
     {
         cout << "CalculateJacobian () - Error - Division by Zero" << endl;
+        // for EKF if our position is close to (0,0) let's use Hj of zeros so that
+        // we regard the measurement as error and keep the uncertainty matrix as it was
+        Hj << 0.,                       0.,                       0.,         0.,
+              0.,                       0.,                       0.,         0.,
+              0.,                       0.,                       0.,         0.;
     }
     //compute the Jacobian matrix
     else

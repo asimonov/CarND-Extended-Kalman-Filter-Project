@@ -62,7 +62,7 @@ public:
   void Update(const VectorXd &z);
 
   /**
-   * Updates the state by using Extended Kalman Filter equations
+   * Updates the state by using Extended Kalman Filter equations. Uses non-linear h(x) for radar measurements.
    * @param z The measurement at k+1
    */
   void UpdateEKF(const VectorXd &z);
